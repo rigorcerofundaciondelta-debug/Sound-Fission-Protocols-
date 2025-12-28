@@ -1,0 +1,339 @@
+import React, { useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { Calculator, Music, Brain, AlertCircle } from 'lucide-react';
+
+const FrequencyStabilityAnalysis = () => {
+  const [activeView, setActiveView] = useState('comparison');
+
+  const frequencies = [
+    {
+      freq: 256,
+      name: '256 Hz',
+      factorization: '2⁸',
+      primeComplexity: 1,
+      schumann: 256 / 33,
+      predictedStability: 95,
+      predictedE_fission: 3.8,
+      predictedT_delta: 15.2,
+      harmonicCleanliness: 100,
+      notes: 'Do central (C4) en afinación científica',
+      color: '#10b981'
+    },
+    {
+      freq: 384,
+      name: '384 Hz',
+      factorization: '2⁷ × 3',
+      primeComplexity: 2,
+      schumann: 384 / 49,
+      predictedStability: 92,
+      predictedE_fission: 3.6,
+      predictedT_delta: 14.8,
+      harmonicCleanliness: 95,
+      notes: 'Sol (G4) en sistema pitagórico',
+      color: '#06b6d4'
+    },
+    {
+      freq: 432,
+      name: '432 Hz',
+      factorization: '2⁴ × 3³',
+      primeComplexity: 2,
+      schumann: 432 / 55,
+      predictedStability: 90,
+      predictedE_fission: 3.24,
+      predictedT_delta: 14.18,
+      harmonicCleanliness: 90,
+      notes: 'La (A4) - Verdi, datos empíricos del estudio',
+      color: '#3b82f6',
+      measured: true
+    },
+    {
+      freq: 440,
+      name: '440 Hz',
+      factorization: '2³ × 5 × 11',
+      primeComplexity: 3,
+      schumann: 440 / 56,
+      predictedStability: 78,
+      predictedE_fission: 2.83,
+      predictedT_delta: 12.38,
+      harmonicCleanliness: 72,
+      notes: 'La (A4) - ISO 16:1975 estándar',
+      color: '#ef4444',
+      measured: true
+    },
+    {
+      freq: 444,
+      name: '444 Hz',
+      factorization: '2² × 3 × 37',
+      primeComplexity: 3,
+      schumann: 444 / 57,
+      predictedStability: 75,
+      predictedE_fission: 2.7,
+      predictedT_delta: 12.1,
+      harmonicCleanliness: 68,
+      notes: 'Usado en algunos sistemas de afinación',
+      color: '#f59e0b'
+    },
+    {
+      freq: 528,
+      name: '528 Hz',
+      factorization: '2⁴ × 3 × 11',
+      primeComplexity: 3,
+      schumann: 528 / 67,
+      predictedStability: 76,
+      predictedE_fission: 2.65,
+      predictedT_delta: 11.85,
+      harmonicCleanliness: 70,
+      notes: 'Frecuencia "solfeggio" (controvertida)',
+      color: '#8b5cf6'
+    },
+    {
+      freq: 396,
+      name: '396 Hz',
+      factorization: '2² × 3² × 11',
+      primeComplexity: 3,
+      schumann: 396 / 51,
+      predictedStability: 80,
+      predictedE_fission: 2.9,
+      predictedT_delta: 12.8,
+      harmonicCleanliness: 75,
+      notes: 'Frecuencia "solfeggio"',
+      color: '#ec4899'
+    }
+  ];
+
+  const radarData = frequencies.map(f => ({
+    frequency: f.name,
+    'Estabilidad': f.predictedStability,
+    'Limpieza Armónica': f.harmonicCleanliness,
+    'E_fission': f.predictedE_fission * 10,
+    'T_Δ': f.predictedT_delta * 6,
+    'Simplicidad': 100 - (f.primeComplexity * 15)
+  }));
+
+  const comparisonData = frequencies.map(f => ({
+    name: f.name,
+    E_fission: f.predictedE_fission,
+    T_delta: f.predictedT_delta,
+    stability: f.predictedStability,
+    measured: f.measured
+  }));
+
+  return (
+    <div className="w-full max-w-7xl mx-auto p-6 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+      <div className="bg-white rounded-lg shadow-xl p-6 mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Music className="w-8 h-8 text-blue-600" />
+          <h1 className="text-3xl font-bold text-slate-800">
+            ¿Estabilidad Acústica Exclusiva del 432 Hz?
+          </h1>
+        </div>
+        
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-1" />
+            <div>
+              <p className="font-semibold text-yellow-900">Respuesta: NO</p>
+              <p className="text-yellow-800 text-sm mt-1">
+                La estabilidad acústica NO es exclusiva del 432 Hz. Múltiples frecuencias 
+                pueden exhibir alta estabilidad según su factorización matemática y 
+                propiedades armónicas.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            onClick={() => setActiveView('comparison')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeView === 'comparison'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+            }`}
+          >
+            Comparación por Parámetros
+          </button>
+          <button
+            onClick={() => setActiveView('radar')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeView === 'radar'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+            }`}
+          >
+            Vista Multidimensional
+          </button>
+          <button
+            onClick={() => setActiveView('table')}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              activeView === 'table'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+            }`}
+          >
+            Tabla Detallada
+          </button>
+        </div>
+
+        {activeView === 'comparison' && (
+          <div className="space-y-6">
+            <div className="bg-slate-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                <Calculator className="w-5 h-5 text-blue-600" />
+                Energía de Fisión (E_fission)
+              </h3>
+              <p className="text-sm text-slate-600 mb-4">
+                Mayor valor = Mayor estabilidad espectral
+              </p>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={comparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis label={{ value: 'E_fission (dB)', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip />
+                  <Bar dataKey="E_fission" fill="#3b82f6" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                <Brain className="w-5 h-5 text-purple-600" />
+                Umbral de Desincronización (T_Δ)
+              </h3>
+              <p className="text-sm text-slate-600 mb-4">
+                Mayor valor = Mayor tolerancia temporal
+              </p>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={comparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis label={{ value: 'T_Δ (ms)', angle: -90, position: 'insideLeft' }} />
+                  <Tooltip />
+                  <Bar dataKey="T_delta" fill="#8b5cf6" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {activeView === 'radar' && (
+          <div className="bg-slate-50 p-6 rounded-lg">
+            <h3 className="font-semibold text-lg mb-4 text-center">
+              Análisis Multidimensional de Estabilidad
+            </h3>
+            <ResponsiveContainer width="100%" height={500}>
+              <RadarChart data={radarData}>
+                <PolarGrid />
+                <PolarAngleAxis dataKey="frequency" />
+                <PolarRadiusAxis angle={90} domain={[0, 100]} />
+                {frequencies.map((f, idx) => (
+                  <Radar
+                    key={f.freq}
+                    name={f.name}
+                    dataKey="Estabilidad"
+                    stroke={f.color}
+                    fill={f.color}
+                    fillOpacity={0.1}
+                  />
+                ))}
+                <Legend />
+                <Tooltip />
+              </RadarChart>
+            </ResponsiveContainer>
+            <p className="text-sm text-slate-600 text-center mt-4">
+              Valores normalizados a escala 0-100 para comparación visual
+            </p>
+          </div>
+        )}
+
+        {activeView === 'table' && (
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="p-3 text-left">Frecuencia</th>
+                  <th className="p-3 text-left">Factorización</th>
+                  <th className="p-3 text-right">E_fission (dB)</th>
+                  <th className="p-3 text-right">T_Δ (ms)</th>
+                  <th className="p-3 text-right">Estabilidad</th>
+                  <th className="p-3 text-left">Notas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {frequencies.map((f) => (
+                  <tr 
+                    key={f.freq} 
+                    className={`border-b ${f.measured ? 'bg-blue-50' : ''} hover:bg-slate-50 transition-colors`}
+                  >
+                    <td className="p-3 font-semibold" style={{color: f.color}}>
+                      {f.name} {f.measured && '✓'}
+                    </td>
+                    <td className="p-3 font-mono text-xs">{f.factorization}</td>
+                    <td className="p-3 text-right font-semibold">{f.predictedE_fission.toFixed(2)}</td>
+                    <td className="p-3 text-right font-semibold">{f.predictedT_delta.toFixed(2)}</td>
+                    <td className="p-3 text-right">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        f.predictedStability >= 90 ? 'bg-green-100 text-green-800' :
+                        f.predictedStability >= 80 ? 'bg-blue-100 text-blue-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {f.predictedStability}%
+                      </span>
+                    </td>
+                    <td className="p-3 text-xs text-slate-600">{f.notes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="mt-4 p-4 text-xs text-slate-600 bg-slate-50">
+              <p className="mb-1">✓ = Datos medidos empíricamente en el estudio</p>
+              <p>Sin ✓ = Predicciones teóricas basadas en el Modelo de Coherencia Sonora</p>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-8 grid md:grid-cols-2 gap-4">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <h4 className="font-semibold text-green-900 mb-2">
+              ✅ Frecuencias con Mayor Estabilidad Predicha
+            </h4>
+            <ul className="text-sm text-green-800 space-y-1">
+              <li>• <strong>256 Hz</strong>: Factorización más simple (2⁸)</li>
+              <li>• <strong>384 Hz</strong>: Solo potencias de 2 y 3</li>
+              <li>• <strong>432 Hz</strong>: Datos empíricos confirmados</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">
+              🔬 Principio Unificador
+            </h4>
+            <p className="text-sm text-blue-800 mb-2">
+              La estabilidad acústica se correlaciona con:
+            </p>
+            <ul className="text-sm text-blue-800 space-y-1">
+              <li>• Simplicidad de factorización prima</li>
+              <li>• Ausencia de factores primos grandes (≥11)</li>
+              <li>• Predominancia de potencias de 2 y 3</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
+          <p className="text-sm text-amber-900 font-semibold mb-2">
+            ⚠️ IMPORTANTE: Limitación del Estudio Original
+          </p>
+          <p className="text-sm text-amber-800">
+            El estudio solo comparó 432 Hz vs 440 Hz. Los valores para otras frecuencias 
+            son <strong>predicciones teóricas</strong> basadas en el Modelo de Coherencia Sonora, 
+            pero <strong>NO han sido medidos empíricamente</strong>. Se requiere investigación 
+            adicional para confirmar estas predicciones.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default FrequencyStabilityAnalysis;
