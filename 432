@@ -1,0 +1,443 @@
+
+"""
+PROTOCOLO DE MEDICIÓN DE ESTABILIDAD ACÚSTICA - 528 Hz
+Adaptado del estudio: Quantum Sonorology (2024)
+Autor original: Julio Alberto Solis Trejo
+Adaptación para: Análisis comparativo de frecuencias
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import signal
+from scipy.fft import fft, fftfreq
+
+# ============================================================================
+# PARTE 1: GENERACIÓN DE ESTÍMULOS
+# ============================================================================
+
+def generate_pure_tone(frequency, duration=5.0, sample_rate=48000, rms_db=-18.0):
+    """
+    Genera tono sinusoidal puro según especificaciones del protocolo.
+    
+    Args:
+        frequency: Frecuencia fundamental en Hz
+        duration: Duración en segundos
+        sample_rate: Tasa de muestreo en Hz
+        rms_db: Nivel RMS en dBFS
+    
+    Returns:
+        audio: Array numpy con la señal
+        t: Array de tiempo
+    """
+    t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+    
+    # Generar onda sinusoidal
+    audio = np.sin(2 * np.pi * frequency * t)
+    
+    # Normalizar a nivel RMS especificado
+    rms_linear = 10 ** (rms_db / 20)
+    current_rms = np.sqrt(np.mean(audio**2))
+    audio = audio * (rms_linear / current_rms)
+    
+    # Aplicar fade-in/fade-out (previene clicks)
+    fade_samples = int(0.02 * sample_rate) # 20 ms
+    fade_in = np.linspace(0, 1, fade_samples)
+    fade_out = np.linspace(1, 0, fade_samples)
+    
+    audio[:fade_samples] *= fade_in
+    audio[-fade_samples:] *= fade_out
+    
+    return audio, t
+
+
+# ============================================================================
+# PARTE 2: PROTOCOLO FSE - FISIÓN POR SATURACIÓN DE ENERGÍA
+# ============================================================================
+
+def calculate_thd(audio, sample_rate, fundamental_freq, n_harmonics=6):
+    """
+    Calcula la Distorsión Armónica Total (THD).
+    
+    THD = √(H₂² + H₃² + H₄² + H₅² + H₆²) / H₁
+    
+    Args:
+        audio: Señal de audio
+        sample_rate: Tasa de muestreo
+        fundamental_freq: Frecuencia fundamental
+        n_harmonics: Número de armónicos a considerar
+    
+    Returns:
+        thd: THD en porcentaje
+        harmonics: Magnitudes de armónicos [H1, H2, ..., H6]
+    """
+    # FFT
+    N = len(audio)
+    fft_result = fft(audio)
+    freqs = fftfreq(N, 1/sample_rate)
+    magnitude = np.abs(fft_result)[:N//2]
+    freqs_positive = freqs[:N//2]
+    
+    # Extraer magnitudes de armónicos
+    harmonics = []
+    for h in range(1, n_harmonics + 1):
+        target_freq = fundamental_freq * h
+        idx = np.argmin(np.abs(freqs_positive - target_freq))
+        harmonics.append(magnitude[idx])
+    
+    # Calcular THD
+    H1 = harmonics[0]
+    sum_harmonics = np.sqrt(np.sum(np.array(harmonics[1:])**2))
+    thd = (sum_harmonics / H1) * 100 if H1 > 0 else 0
+    
+    return thd, harmonics
+
+
+def temporal_correlation(signal_data, delay_ms=10, sample_rate=48000):
+    """
+    Calcula correlación temporal con delay específico.
+    
+    Args:
+        signal_data: Señal de audio
+        delay_ms: Delay en milisegundos
+        sample_rate: Tasa de muestreo
+    
+    Returns:
+        r: Coeficiente de correlación
+    """
+    delay_samples = int((delay_ms / 1000) * sample_rate)
+    
+    if delay_samples >= len(signal_data):
+        return 0.0
+    
+    x = signal_data[:-delay_samples]
+    y = signal_data[delay_samples:]
+    
+    r = np.corrcoef(x, y)[0, 1]
+    return r
+
+
+def protocol_fse(frequency, n_replicas=10, sample_rate=48000):
+    """
+    PROTOCOLO FSE: Fisión por Saturación de Energía
+    
+    Incrementa ganancia hasta que:
+    1. THD > 1.0% Y
+    2. Correlación temporal < 0.70
+    
+    Args:
+        frequency: Frecuencia a evaluar (Hz)
+        n_replicas: Número de réplicas
+        sample_rate: Tasa de muestreo
+    
+    Returns:
+        results: Dict con E_fission para cada réplica
+    """
+    print(f"\n{'='*70}")
+    print(f"PROTOCOLO FSE - Frecuencia: {frequency} Hz")
+    print(f"{'='*70}\n")
+    
+    e_fission_values = []
+    
+    for replica in range(n_replicas):
+        # Generar tono puro
+        audio, t = generate_pure_tone(frequency, sample_rate=sample_rate)
+        
+        # Incremento sistemático de ganancia
+        current_gain = 0.0
+        step = 0.1 # dB por iteración
+        max_gain = 20.0 # Límite de seguridad
+        
+        while current_gain < max_gain:
+            # Aplicar ganancia
+            gain_linear = 10 ** (current_gain / 20)
+            audio_gained = audio * gain_linear
+            
+            # Limitar para evitar clipping destructivo
+            audio_gained = np.clip(audio_gained, -1.0, 1.0)
+            
+            # CRITERIO A: THD
+            thd, _ = calculate_thd(audio_gained, sample_rate, frequency)
+            
+            # CRITERIO B: Correlación temporal
+            corr = temporal_correlation(audio_gained, delay_ms=10, sample_rate=sample_rate)
+            
+            # Verificar ambos criterios
+            if thd > 1.0 and corr < 0.70:
+                e_fission_values.append(current_gain)
+                print(f"Réplica {replica+1}: E_fission = {current_gain:.2f} dB "
+                      f"(THD={thd:.3f}%, r={corr:.3f})")
+                break
+            
+            current_gain += step
+        
+        if current_gain >= max_gain:
+            print(f"Réplica {replica+1}: No alcanzó criterio (límite {max_gain} dB)")
+    
+    # Estadísticas
+    results = {
+        'frequency': frequency,
+        'n_replicas': len(e_fission_values),
+        'e_fission_values': e_fission_values,
+        'mean': np.mean(e_fission_values) if e_fission_values else 0,
+        'std': np.std(e_fission_values, ddof=1) if e_fission_values else 0,
+        'median': np.median(e_fission_values) if e_fission_values else 0
+    }
+    
+    print(f"\n{'─'*70}")
+    print(f"RESULTADOS FSE - {frequency} Hz:")
+    print(f" Media: {results['mean']:.2f} ± {results['std']:.2f} dB")
+    print(f" Mediana: {results['median']:.2f} dB")
+    print(f" Rango: [{min(e_fission_values):.2f}, {max(e_fission_values):.2f}] dB")
+    print(f"{'─'*70}\n")
+    
+    return results
+
+
+# ============================================================================
+# PARTE 3: PROTOCOLO FDT - FISIÓN POR DESINCRONIZACIÓN TEMPORAL
+# ============================================================================
+
+def calculate_msc_at_frequency(track_a, track_b, sample_rate, target_freq, 
+                                nperseg=4096, noverlap=2048):
+    """
+    Calcula Magnitude-Squared Coherence en frecuencia específica.
+    
+    MSC(f) = |Pxy(f)|² / (Pxx(f) · Pyy(f))
+    
+    Args:
+        track_a, track_b: Señales de audio
+        sample_rate: Tasa de muestreo
+        target_freq: Frecuencia objetivo
+        nperseg: Longitud de segmento
+        noverlap: Superposición
+    
+    Returns:
+        msc_value: Valor MSC en la frecuencia objetivo
+        frequencies: Array de frecuencias
+        coherence: Array de coherencia completo
+    """
+    # Calcular coherencia usando método de Welch
+    frequencies, coherence = signal.coherence(
+        track_a, track_b,
+        fs=sample_rate,
+        window='hann',
+        nperseg=nperseg,
+        noverlap=noverlap
+    )
+    
+    # Encontrar índice más cercano a frecuencia objetivo
+    idx = np.argmin(np.abs(frequencies - target_freq))
+    msc_value = coherence[idx]
+    
+    return msc_value, frequencies, coherence
+
+
+def protocol_fdt(frequency, n_replicas=10, sample_rate=48000):
+    """
+    PROTOCOLO FDT: Fisión por Desincronización Temporal
+    
+    Encuentra el offset temporal que reduce MSC < 0.50
+    
+    Args:
+        frequency: Frecuencia a evaluar (Hz)
+        n_replicas: Número de réplicas
+        sample_rate: Tasa de muestreo
+    
+    Returns:
+        results: Dict con T_delta para cada réplica
+    """
+    print(f"\n{'='*70}")
+    print(f"PROTOCOLO FDT - Frecuencia: {frequency} Hz")
+    print(f"{'='*70}\n")
+    
+    t_delta_values = []
+    
+    for replica in range(n_replicas):
+        # Generar dos pistas idénticas
+        track_a, _ = generate_pure_tone(frequency, sample_rate=sample_rate)
+        track_b, _ = generate_pure_tone(frequency, sample_rate=sample_rate)
+        
+        # Ajustar nivel para suma (-21 dBFS cada una)
+        adjustment = 10 ** (-3 / 20)
+        track_a *= adjustment
+        track_b *= adjustment
+        
+        # Búsqueda binaria adaptativa
+        dt_current = 10.0 # ms inicial
+        step = 2.0
+        tolerance = 0.1
+        max_iterations = 20
+        
+        for iteration in range(max_iterations):
+            # Aplicar offset temporal
+            offset_samples = int((dt_current / 1000) * sample_rate)
+            
+            if offset_samples >= len(track_b):
+                dt_current -= step
+                step /= 2
+                continue
+            
+            # Crear pista B con offset
+            track_b_offset = np.zeros_like(track_a)
+            track_b_offset[offset_samples:] = track_b[:-offset_samples]
+            
+            # Mezclar pistas
+            mix = track_a + track_b_offset
+            
+            # Calcular MSC
+            msc, _, _ = calculate_msc_at_frequency(
+                track_a, track_b_offset, sample_rate, frequency
+            )
+            
+            # Verificar criterio
+            if abs(msc - 0.50) < 0.02: # Cerca del umbral
+                t_delta_values.append(dt_current)
+                print(f"Réplica {replica+1}: T_Δ = {dt_current:.2f} ms (MSC={msc:.3f})")
+                break
+            
+            # Ajustar búsqueda
+            if msc >= 0.50:
+                dt_current += step
+            else:
+                dt_current -= step / 2
+                step /= 2
+            
+            if step < tolerance:
+                t_delta_values.append(dt_current)
+                print(f"Réplica {replica+1}: T_Δ = {dt_current:.2f} ms (convergencia)")
+                break
+    
+    # Estadísticas
+    results = {
+        'frequency': frequency,
+        'n_replicas': len(t_delta_values),
+        't_delta_values': t_delta_values,
+        'mean': np.mean(t_delta_values) if t_delta_values else 0,
+        'std': np.std(t_delta_values, ddof=1) if t_delta_values else 0,
+        'median': np.median(t_delta_values) if t_delta_values else 0
+    }
+    
+    print(f"\n{'─'*70}")
+    print(f"RESULTADOS FDT - {frequency} Hz:")
+    print(f" Media: {results['mean']:.2f} ± {results['std']:.2f} ms")
+    print(f" Mediana: {results['median']:.2f} ms")
+    print(f" Rango: [{min(t_delta_values):.2f}, {max(t_delta_values):.2f}] ms")
+    print(f"{'─'*70}\n")
+    
+    return results
+
+
+# ============================================================================
+# PARTE 4: ANÁLISIS COMPARATIVO
+# ============================================================================
+
+def comparative_analysis(frequencies=[432, 440, 528], n_replicas=10):
+    """
+    Ejecuta análisis comparativo completo.
+    
+    Args:
+        frequencies: Lista de frecuencias a evaluar
+        n_replicas: Número de réplicas por frecuencia
+    """
+    print("\n" + "="*70)
+    print(" ANÁLISIS COMPARATIVO DE ESTABILIDAD ACÚSTICA")
+    print("="*70)
+    
+    all_results_fse = {}
+    all_results_fdt = {}
+    
+    for freq in frequencies:
+        # Protocolo FSE
+        all_results_fse[freq] = protocol_fse(freq, n_replicas=n_replicas)
+        
+        # Protocolo FDT
+        all_results_fdt[freq] = protocol_fdt(freq, n_replicas=n_replicas)
+    
+    # Visualización
+    create_comparison_plots(all_results_fse, all_results_fdt, frequencies)
+    
+    # Tabla resumen
+    print("\n" + "="*70)
+    print(" TABLA COMPARATIVA FINAL")
+    print("="*70)
+    print(f"\n{'Frecuencia':<12} {'E_fission (dB)':<20} {'T_Δ (ms)':<20}")
+    print("─"*52)
+    
+    for freq in frequencies:
+        e_mean = all_results_fse[freq]['mean']
+        e_std = all_results_fse[freq]['std']
+        t_mean = all_results_fdt[freq]['mean']
+        t_std = all_results_fdt[freq]['std']
+        
+        print(f"{freq} Hz {e_mean:.2f} ± {e_std:.2f} "
+              f"{t_mean:.2f} ± {t_std:.2f}")
+    
+    print("─"*52)
+    print("\nInterpretación:")
+    print("• Mayor E_fission = Mayor estabilidad espectral")
+    print("• Mayor T_Δ = Mayor tolerancia temporal")
+    print("="*70 + "\n")
+
+
+def create_comparison_plots(results_fse, results_fdt, frequencies):
+    """Crea gráficos comparativos."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    
+    # Gráfico 1: E_fission
+    means_e = [results_fse[f]['mean'] for f in frequencies]
+    stds_e = [results_fse[f]['std'] for f in frequencies]
+    colors = ['#2E86AB', '#A23B72', '#F18F01']
+    
+    ax1.bar(range(len(frequencies)), means_e, yerr=stds_e, 
+            color=colors, alpha=0.7, capsize=10)
+    ax1.set_xlabel('Frecuencia (Hz)', fontsize=12)
+    ax1.set_ylabel('E_fission (dB)', fontsize=12)
+    ax1.set_title('Energía de Fisión por Saturación', fontsize=14, fontweight='bold')
+    ax1.set_xticks(range(len(frequencies)))
+    ax1.set_xticklabels([f'{f} Hz' for f in frequencies])
+    ax1.grid(axis='y', alpha=0.3)
+    
+    # Gráfico 2: T_Δ
+    means_t = [results_fdt[f]['mean'] for f in frequencies]
+    stds_t = [results_fdt[f]['std'] for f in frequencies]
+    
+    ax2.bar(range(len(frequencies)), means_t, yerr=stds_t,
+            color=colors, alpha=0.7, capsize=10)
+    ax2.set_xlabel('Frecuencia (Hz)', fontsize=12)
+    ax2.set_ylabel('T_Δ (ms)', fontsize=12)
+    ax2.set_title('Umbral de Desincronización Temporal', fontsize=14, fontweight='bold')
+    ax2.set_xticks(range(len(frequencies)))
+    ax2.set_xticklabels([f'{f} Hz' for f in frequencies])
+    ax2.grid(axis='y', alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+
+
+# ============================================================================
+# EJECUCIÓN DEL ANÁLISIS
+# ============================================================================
+
+if __name__ == "__main__":
+    print("""
+    ╔══════════════════════════════════════════════════════════════════╗
+    ║ PROTOCOLO DE MEDICIÓN DE ESTABILIDAD ACÚSTICA ║
+    ║ Adaptado de: Quantum Sonorology (2024) ║
+    ║ Evaluación de: 432 Hz, 440 Hz y 528 Hz ║
+    ╚══════════════════════════════════════════════════════════════════╝
+    """)
+    
+    # Ejecutar análisis completo con 5 réplicas (reducido para demostración)
+    comparative_analysis(frequencies=[432, 440, 528], n_replicas=5)
+    
+    print("""
+    ╔══════════════════════════════════════════════════════════════════╗
+    ║ ANÁLISIS COMPLETADO ║
+    ║ ║
+    ║ Nota: Este es un modelo simplificado para demostración. ║
+    ║ Para resultados definitivos, replicar con: ║
+    ║ • n_replicas = 10 (mínimo) ║
+    ║ • Equipamiento calibrado (protocolo completo) ║
+    ║ • Múltiples laboratorios independientes ║
+    ╚══════════════════════════════════════════════════════════════════╝
+    """)
