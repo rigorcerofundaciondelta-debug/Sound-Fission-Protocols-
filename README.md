@@ -29,3 +29,6 @@ Sound Fission Protocols (FSE/FDT): A Standardized Methodology for Quantifying Ac
 ​EU AI Act: Requisitos de transparencia para sistemas de audio de alto riesgo.  
 ​📝 Citación
 ​Si utilizas este índice en tus investigaciones o desarrollo de productos, por favor cita el Informe Técnico: Implementación del Índice de Coherencia Acústica (ICA) en Modelos de IA Generativa de Audio.
+10.6084/m9.figshare.30738203
+​DOI: 10.5281/zenodo.14241777
+https://doi.org/10.5281/zenodo.17986109
